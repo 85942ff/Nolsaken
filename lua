@@ -641,7 +641,7 @@ end)
 
 
 local Window = Library:CreateWindow({
-	Title = "被遗弃",
+	Title = "NOLSAKEN",
 	Footer = "被遗弃｜NOLSAKEN TEST",
 	NotifySide = "Right",
 	ShowCustomCursor = true,
