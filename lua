@@ -3232,6 +3232,8 @@ local function CreateFeatures()
     local proThread = nil
     local proEventCount = 2000
     local PRO_BATCH_INTERVAL = 5
+    local proRange = 40
+    local proCheckInterval = 0.2
 
     local function teleportToFirstSurvivor()
         local survivors = workspace.Players:FindFirstChild("Survivors")
@@ -3343,16 +3345,41 @@ local function CreateFeatures()
             if state then
                 proThread = task.spawn(function()
                     while proRunning do
-                        for _ = 1, proEventCount do
-                            pcall(function()
-                                local eventName = getEventName()
-                                if eventName then
-                                    remote:FireServer(eventName, { buffer.fromstring("\1\1") })
+                        local localPlayer = game.Players.LocalPlayer
+                        local char = localPlayer and localPlayer.Character
+                        local root = char and char:FindFirstChild("HumanoidRootPart")
+                        local shouldAttack = false
+
+                        if root then
+                            local survivors = workspace.Players:FindFirstChild("Survivors")
+                            if survivors then
+                                for _, survivor in ipairs(survivors:GetChildren()) do
+                                    local part = survivor:FindFirstChild("PrimaryPart") or survivor:FindFirstChild("HumanoidRootPart")
+                                    if part then
+                                        local dist = (root.Position - part.Position).Magnitude
+                                        if dist <= proRange then
+                                            shouldAttack = true
+                                            break
+                                        end
+                                    end
                                 end
-                            end)
+                            end
                         end
-                        print("已发送 " .. proEventCount .. " 个数据包 (PRO)")
-                        task.wait(PRO_BATCH_INTERVAL)
+
+                        if shouldAttack then
+                            for _ = 1, proEventCount do
+                                pcall(function()
+                                    local eventName = getEventName()
+                                    if eventName then
+                                        remote:FireServer(eventName, { buffer.fromstring("\1\1") })
+                                    end
+                                end)
+                            end
+                            print("已发送 " .. proEventCount .. " 个数据包 (PRO) 在范围内")
+                            task.wait(PRO_BATCH_INTERVAL)
+                        else
+                            task.wait(proCheckInterval)
+                        end
                     end
                 end)
             end
@@ -3367,6 +3394,28 @@ local function CreateFeatures()
         Rounding = 1,
         Callback = function(value)
             proEventCount = math.floor(value)
+        end
+    })
+
+    MainGroup:AddSlider("ProCheckInterval", {
+        Text = "Pro检测间隔",
+        Default = 0.2,
+        Min = 0,
+        Max = 3.0,
+        Rounding = 1,
+        Callback = function(value)
+            proCheckInterval = value
+        end
+    })
+
+    MainGroup:AddSlider("ProRange", {
+        Text = "Pro攻击范围",
+        Default = 40,
+        Min = 10,
+        Max = 100,
+        Rounding = 1,
+        Callback = function(value)
+            proRange = value
         end
     })
 end
