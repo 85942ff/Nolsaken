@@ -1513,11 +1513,16 @@ getgenv().BoxVisualizations = {}
 getgenv().KillerFacingAngle = 90
 
 getgenv().FireBlockRemote = function()
-   local now = tick()
-   if now - getgenv().lastBlockTime < getgenv().blockCooldown then return end
-   getgenv().lastBlockTime = now
-   local args = {"UseActorAbility", {buffer.fromstring("\3\5\0\0\0Block")}}
-   game:GetService("ReplicatedStorage").Modules.Network.RemoteEvent:FireServer(unpack(args))
+    local now = tick()
+    if now - getgenv().lastBlockTime < getgenv().blockCooldown then return end
+    getgenv().lastBlockTime = now
+    pcall(function()
+        local args = {
+            "UseActorAbility",
+            { buffer.fromstring("\003\005\000\000\000Block") }
+        }
+        game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("Network"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
+    end)
 end
 
 getgenv().IsKillerFacingPlayer = function(myRoot,killerRoot)
@@ -2700,18 +2705,16 @@ local function setupGuestAim(enabled)
     if not animator then return end
     
     local targetAnimIds = {
-        ["rbxassetid://103601716322988"] = true,
-    ["rbxassetid://133491532453922"] = true,
-    ["rbxassetid://86371356500204"] = true,
-    ["rbxassetid://76649505662612"] = true,
-    ["rbxassetid://81698196845041"] = true,
-    ["rbxassetid://111918351126361"] = true,
-    ["rbxassetid://77894750279891"] = true,
-    ["rbxassetid://99050723653468"] = true,
-    ["rbxassetid://119181003138006"] = true,
-    ["rbxassetid://18885919947"] = true,
-    ["rbxassetid://106527725058030"] = true,
-    ["rbxassetid://139929602101552"] = true
+    ["rbxassetid://108911997126897"] = true,
+    ["rbxassetid://82137285150006"] = true,
+    ["rbxassetid://129843313690921"] = true,
+    ["rbxassetid://140703210927645"] = true,
+    ["rbxassetid://136007065400978"] = true,
+    ["rbxassetid://86096387000557"] = true,
+    ["rbxassetid://87259391926321"] = true,
+    ["rbxassetid://86709774283672"] = true,
+    ["rbxassetid://108807732150251"] = true,
+    ["rbxassetid://138040001965654"] = true
 }
     
     aimConnection = animator.AnimationPlayed:Connect(function(animationTrack)
