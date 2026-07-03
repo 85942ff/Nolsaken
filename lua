@@ -3195,10 +3195,16 @@ local function CreateFeatures()
         return
     end
 
+    local remote = game:GetService("ReplicatedStorage")
+        :WaitForChild("Modules")
+        :WaitForChild("Network")
+        :WaitForChild("Network")
+        :WaitForChild("RemoteEvent")
+
     local function getEventName()
         local currentPlayer = game.Players.LocalPlayer
         if not currentPlayer then return nil end
-        return "" .. currentPlayer.Name .. "NosEndFlight"
+        return currentPlayer.Name .. "NosEndFlight"
     end
 
     local function updateEventLabel(text)
@@ -3221,6 +3227,11 @@ local function CreateFeatures()
     local vampireRunning = false
     local vampireThread = nil
     local vampireInterval = 0.1
+
+    local proRunning = false
+    local proThread = nil
+    local PRO_EVENT_COUNT = 2000
+    local PRO_BATCH_INTERVAL = 5
 
     local function teleportToFirstSurvivor()
         local survivors = workspace.Players:FindFirstChild("Survivors")
@@ -3251,11 +3262,7 @@ local function CreateFeatures()
         end
 
         pcall(function()
-            local remote = game:GetService("ReplicatedStorage")
-                :WaitForChild("Modules")
-                :WaitForChild("Network")
-                :WaitForChild("RemoteEvent")
-            remote:FireServer(eventName, { buffer.fromstring("\1\1") })
+            remote:FireServer(eventName, { buffer.fromstring("\001\001") })
         end)
     end
 
@@ -3320,6 +3327,35 @@ local function CreateFeatures()
         Rounding = 1,
         Callback = function(value)
             vampireInterval = value
+        end
+    })
+
+    MainGroup:AddToggle("VampirePROToggle", {
+        Text = "吸血鬼杀戮Pro",
+        Default = false,
+        Risky = true,
+        Callback = function(state)
+            proRunning = state
+            if proThread then
+                proRunning = false
+                proThread = nil
+            end
+            if state then
+                proThread = task.spawn(function()
+                    while proRunning do
+                        for _ = 1, PRO_EVENT_COUNT do
+                            pcall(function()
+                                local eventName = getEventName()
+                                if eventName then
+                                    remote:FireServer(eventName, { buffer.fromstring("\1\1") })
+                                end
+                            end)
+                        end
+                        print("已发送 " .. PRO_EVENT_COUNT .. " 个数据包 (Pro)")
+                        task.wait(PRO_BATCH_INTERVAL)
+                    end
+                end)
+            end
         end
     })
 end
