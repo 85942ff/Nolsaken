@@ -3222,8 +3222,8 @@ createAnimationTrigger("JohnDoe", {
 }, "Survivors", true)
 
 createAnimationTrigger("Nosferatu", {
-    ["99050723653468"] = true,
-    ["120038054863702"] = true
+    ["79282445348798"] = true,
+    ["128009545282102"] = true
 }, "Survivors", true)
 
 createAnimationTrigger("Punch", {
