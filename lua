@@ -648,15 +648,16 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-	Bro = Window:AddTab('绘制', 'eye'),           -- 别名，指向 Visual
-	Block = Window:AddTab('格挡', 'user'),        -- 别名，指向 zdg
-	Sat = Window:AddTab('体力', 'zap'),
-	zdx = Window:AddTab('电机', 'printer'),
-	Aimbot = Window:AddTab('自瞄', 'crosshair'),
-	tfz = Window:AddTab('杀戮', 'skull'),
-	ani = Window:AddTab('反效果', 'cpu'),
-	yul = Window:AddTab('娱乐功能', 'cpu'),
-	["UI Settings"] = Window:AddTab('UI 调试', 'settings')
+	Bro = Window:AddTab('绘制', 'eye'),           -- 绘制
+	Block = Window:AddTab('格挡', 'user'),        -- 格挡
+	Sat = Window:AddTab('体力', 'zap'),           -- 体力
+	Ability = Window:AddTab('能力', 'star'),      -- 能力（放在体力下面）
+	zdx = Window:AddTab('电机', 'printer'),       -- 电机
+	Aimbot = Window:AddTab('自瞄', 'crosshair'),  -- 自瞄
+	tfz = Window:AddTab('杀戮', 'skull'),         -- 杀戮
+	ani = Window:AddTab('反效果', 'cpu'),         -- 反效果
+	yul = Window:AddTab('娱乐功能', 'cpu'),       -- 娱乐功能
+	["UI Settings"] = Window:AddTab('UI 调试', 'settings') -- UI调试
 }
 
 
@@ -2366,6 +2367,146 @@ MVP2:AddSlider('MySlider4', {
         end
     end
 })
+
+local MainGroup = Tabs.Ability:AddLeftGroupbox("自动钩子 & 自动挣脱")
+
+local function CreateFeatures()
+    if not Tabs or not Tabs.Ability then
+        warn("UI 容器未找到")
+        return
+    end
+
+    local function getHookEventName()
+        local currentPlayer = game.Players.LocalPlayer
+        return currentPlayer and (currentPlayer.Name .. "NosHookQTE") or nil
+    end
+
+    local function getEndFlightEventName()
+        local currentPlayer = game.Players.LocalPlayer
+        return currentPlayer and (currentPlayer.Name .. "NosEndFlight") or nil
+    end
+
+    local function updateEventLabel(text)
+        if not eventLabel then return end
+        if eventLabel.Text ~= nil then
+            eventLabel.Text = text
+        elseif eventLabel.SetText then
+            eventLabel:SetText(text)
+        elseif eventLabel.ChangeText then
+            eventLabel:ChangeText(text)
+        else
+            warn("无法更新标签，请手动检查 UI 库")
+        end
+    end
+
+    local hookRunning = false
+    local hookThread = nil
+    local hookInterval = 0.1
+
+    local function fireHookEvent()
+        local eventName = getHookEventName()
+        if not eventName then return end
+        pcall(function()
+            local remote = game:GetService("ReplicatedStorage")
+                :WaitForChild("Modules")
+                :WaitForChild("Network")
+                :WaitForChild("Network")
+                :WaitForChild("RemoteEvent")
+            remote:FireServer(eventName, { buffer.fromstring("\001\001") })
+        end)
+    end
+
+    MainGroup:AddToggle("HookToggle", {
+        Text = "自动钩子",
+        Default = false,
+        Risky = true,
+        Callback = function(state)
+            hookRunning = state
+            if hookThread then
+                task.cancel(hookThread)
+                hookThread = nil
+            end
+            if state then
+                local eventName = getHookEventName()
+                updateEventLabel("钩子事件: " .. (eventName or "未知"))
+                hookThread = task.spawn(function()
+                    while hookRunning do
+                        fireHookEvent()
+                        task.wait(hookInterval)
+                    end
+                end)
+            else
+                updateEventLabel("钩子事件: 已停止")
+            end
+        end,
+    })
+
+    MainGroup:AddSlider("HookSpeed", {
+        Text = "钩子间隔 (秒)",
+        Default = 0.1,
+        Min = 0.1,
+        Max = 1.0,
+        Rounding = 2,
+        Callback = function(value)
+            hookInterval = value
+        end
+    })
+
+    local endFlightRunning = false
+    local endFlightThread = nil
+    local endFlightInterval = 0.1
+
+    local function fireEndFlightEvent()
+        local eventName = getEndFlightEventName()
+        if not eventName then return end
+        pcall(function()
+            local remote = game:GetService("ReplicatedStorage")
+                :WaitForChild("Modules")
+                :WaitForChild("Network")
+                :WaitForChild("Network")
+                :WaitForChild("RemoteEvent")
+            remote:FireServer(eventName, { buffer.fromstring("\001\001") })
+        end)
+    end
+
+    MainGroup:AddToggle("EndFlightToggle", {
+        Text = "自动挣脱",
+        Default = false,
+        Risky = true,
+        Callback = function(state)
+            endFlightRunning = state
+            if endFlightThread then
+                task.cancel(endFlightThread)
+                endFlightThread = nil
+            end
+            if state then
+                local eventName = getEndFlightEventName()
+                updateEventLabel("挣脱事件: " .. (eventName or "未知"))
+                endFlightThread = task.spawn(function()
+                    while endFlightRunning do
+                        fireEndFlightEvent()
+                        task.wait(endFlightInterval)
+                    end
+                end)
+            else
+                updateEventLabel("挣脱事件: 已停止")
+            end
+        end,
+    })
+
+    MainGroup:AddSlider("EndFlightSpeed", {
+        Text = "挣脱间隔 (秒)",
+        Default = 0.1,
+        Min = 0.1,
+        Max = 1.0,
+        Rounding = 2,
+        Callback = function(value)
+            endFlightInterval = value
+        end
+    })
+end
+
+CreateFeatures()
 
 local Generator = Tabs.zdx:AddLeftGroupbox("自动修机")
 
