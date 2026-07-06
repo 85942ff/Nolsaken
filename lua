@@ -2381,10 +2381,22 @@ local function CreateFeatures()
         return currentPlayer and (currentPlayer.Name .. "NosHookQTE") or nil
     end
 
+    -- ===== 修改处：自动挣脱事件名改为杀手名字 + NosHookQTE =====
     local function getEndFlightEventName()
-        local currentPlayer = game.Players.LocalPlayer
-        return currentPlayer and (currentPlayer.Name .. "NosEndFlight") or nil
+        local killers = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers")
+        if killers then
+            local children = killers:GetChildren()
+            if #children > 0 then
+                local firstKiller = children[1]
+                local username = firstKiller:GetAttribute("Username")
+                if username and username ~= "" then
+                    return username .. "NosHookQTE"
+                end
+            end
+        end
+        return nil
     end
+    -- ============================================================
 
     local function updateEventLabel(text)
         if not eventLabel then return end
