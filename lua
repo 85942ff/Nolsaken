@@ -1,4 +1,5 @@
 local repo = "https://raw.githubusercontent.com/SyndromeXph/NOL-Obsidian/refs/heads/main/"
+
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
@@ -9,8 +10,6 @@ local Toggles = Library.Toggles
 Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 
-
-local LibESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/ImamGV/Script/main/ESP"))()
 
 local Services = {
     Players = game:GetService("Players"),
