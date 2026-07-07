@@ -5742,6 +5742,104 @@ CameraGroup:AddCheckbox("CustomFOV", {
     end,
 })
 
+InvisibleGroup = Tabs.yul:AddRightGroupbox("隐身")
+invisibleEnabled = false
+invisibleDisconnect = nil
+
+function StartInvisible()
+    Players = game:GetService("Players")
+    player = Players.LocalPlayer
+    character = player.Character or player.CharacterAdded:Wait()
+    if not character then return nil end
+    rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return nil end
+    originalCFrame = rootPart.CFrame
+    rootPart.CFrame = originalCFrame + Vector3.new(0, -300, 0)
+    rootPart.Anchored = true
+    task.wait(1)
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local TargetRemote = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("Network"):WaitForChild("UnreliableRemoteEvent")
+    local OldNamecall, OldFireServer, DiedConnection, RemovingConnection
+    local function DisconnectSpy()
+        if DiedConnection then DiedConnection:Disconnect() end
+        if RemovingConnection then RemovingConnection:Disconnect() end
+        if OldNamecall then
+            if hookmetamethod then
+                hookmetamethod(game, "__namecall", OldNamecall)
+            else
+                local mt = getrawmetatable(game)
+                setreadonly(mt, false)
+                mt.__namecall = OldNamecall
+                setreadonly(mt, true)
+            end
+        end
+        if OldFireServer then
+            hookfunction(TargetRemote.FireServer, OldFireServer)
+        end
+    end
+    RemovingConnection = player.CharacterRemoving:Connect(DisconnectSpy)
+    if player.Character then
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            DiedConnection = humanoid.Died:Connect(DisconnectSpy)
+        end
+    end
+    if hookmetamethod then
+        OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if self == TargetRemote and (method == "FireServer" or method == "fireServer") then
+                return
+            end
+            return OldNamecall(self, ...)
+        end))
+    else
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        OldNamecall = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if self == TargetRemote and (method == "FireServer" or method == "fireServer") then
+                return
+            end
+            return OldNamecall(self, ...)
+        end)
+        setreadonly(mt, true)
+    end
+    if hookfunction then
+        OldFireServer = hookfunction(TargetRemote.FireServer, newcclosure(function(self, ...)
+            if self == TargetRemote then
+                return
+            end
+            return OldFireServer(self, ...)
+        end))
+    end
+    task.wait(1)
+    rootPart.Anchored = false
+    rootPart.CFrame = originalCFrame
+    return DisconnectSpy
+end
+
+InvisibleGroup:AddToggle("InvisibleToggle", {
+    Text = "启用隐身",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            if not invisibleEnabled then
+                invisibleDisconnect = StartInvisible()
+                invisibleEnabled = true
+            end
+        else
+            if invisibleEnabled then
+                if invisibleDisconnect then
+                    invisibleDisconnect()
+                    invisibleDisconnect = nil
+                end
+                invisibleEnabled = false
+            end
+        end
+    end
+})
+
 
 MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("菜单", "wrench")
 
