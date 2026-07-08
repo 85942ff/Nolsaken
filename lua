@@ -2999,6 +2999,236 @@ GeneratorGroup:AddButton({
 
 print("[Obsidian UI] 自动快速发电机模块已加载")
 
+-- ==================== 连线修机核心 ====================
+do
+    local CONFIG = {
+        AutoConnect = false,
+        ConnectionSpeed = 1,
+        MaxWaitTime = 3,
+        NodesPerUpdate = 5,
+    }
+
+    local function getDirection(currentRow, currentCol, otherRow, otherCol)
+        if otherRow < currentRow then return "up" end
+        if otherRow > currentRow then return "down" end
+        if otherCol < currentCol then return "left" end
+        if otherCol > currentCol then return "right" end
+        return nil
+    end
+
+    local function getConnections(prev, curr, nextnode)
+        local connections = {}
+        if prev and curr then
+            local dir = getDirection(curr.row, curr.col, prev.row, prev.col)
+            if dir == "up" then dir = "down"
+            elseif dir == "down" then dir = "up"
+            elseif dir == "left" then dir = "right"
+            elseif dir == "right" then dir = "left" end
+            if dir then connections[dir] = true end
+        end
+        if nextnode and curr then
+            local dir = getDirection(curr.row, curr.col, nextnode.row, nextnode.col)
+            if dir then connections[dir] = true end
+        end
+        return connections
+    end
+
+    local function isNeighbourLocal(r1, c1, r2, c2)
+        if r2 == r1 - 1 and c2 == c1 then return "up" end
+        if r2 == r1 + 1 and c2 == c1 then return "down" end
+        if r2 == r1 and c2 == c1 - 1 then return "left" end
+        if r2 == r1 and c2 == c1 + 1 then return "right" end
+        return false
+    end
+
+    local function coordKey(node)
+        return string.format("%d-%d", node.row, node.col)
+    end
+
+    local function orderPathFromEndpoints(path, endpoints)
+        if not path or #path == 0 then return path end
+
+        local startEndpoint
+        for _, ep in ipairs(endpoints or {}) do
+            for _, n in ipairs(path) do
+                if n.row == ep.row and n.col == ep.col then
+                    startEndpoint = { row = ep.row, col = ep.col }
+                    break
+                end
+            end
+            if startEndpoint then break end
+        end
+
+        if not startEndpoint then
+            local inPath = {}
+            for _, n in ipairs(path) do inPath[coordKey(n)] = n end
+
+            for _, n in ipairs(path) do
+                local neighbours = 0
+                local dirs = { { n.row - 1, n.col }, { n.row + 1, n.col }, { n.row, n.col - 1 }, { n.row, n.col + 1 } }
+                for _, dir in ipairs(dirs) do
+                    local r, c = dir[1], dir[2]
+                    if inPath[string.format("%d-%d", r, c)] then neighbours = neighbours + 1 end
+                end
+                if neighbours == 1 then
+                    startEndpoint = { row = n.row, col = n.col }
+                    break
+                end
+            end
+        end
+
+        if not startEndpoint then
+            startEndpoint = { row = path[1].row, col = path[1].col }
+        end
+
+        local remaining = {}
+        for _, n in ipairs(path) do remaining[coordKey(n)] = { row = n.row, col = n.col } end
+
+        local ordered = {}
+        local current = { row = startEndpoint.row, col = startEndpoint.col }
+        table.insert(ordered, { row = current.row, col = current.col })
+        remaining[coordKey(current)] = nil
+
+        while true do
+            local size = 0
+            for _ in pairs(remaining) do size = size + 1 end
+            if size <= 0 then break end
+
+            local foundNext = false
+            for key, node in pairs(remaining) do
+                if isNeighbourLocal(current.row, current.col, node.row, node.col) then
+                    table.insert(ordered, { row = node.row, col = node.col })
+                    remaining[key] = nil
+                    current = node
+                    foundNext = true
+                    break
+                end
+            end
+            if not foundNext then return path end
+        end
+        return ordered
+    end
+
+    local function drawSolutionOneByOne(puzzle)
+        if not puzzle or not puzzle.Solution then return end
+
+        local totalPaths = #puzzle.Solution
+        local indices = {}
+        for i = 1, totalPaths do table.insert(indices, i) end
+
+        for i = totalPaths, 2, -1 do
+            local j = math.random(i)
+            indices[i], indices[j] = indices[j], indices[i]
+        end
+
+        for _, colorIndex in ipairs(indices) do
+            local path = puzzle.Solution[colorIndex]
+            local endpoints = puzzle.targetPairs and puzzle.targetPairs[colorIndex] or nil
+            local orderedPath = orderPathFromEndpoints(path, endpoints)
+
+            puzzle.paths = puzzle.paths or {}
+            puzzle.paths[colorIndex] = {}
+            puzzle.gridConnections = puzzle.gridConnections or {}
+
+            for i = 1, #orderedPath do
+                local node = orderedPath[i]
+                table.insert(puzzle.paths[colorIndex], { row = node.row, col = node.col })
+
+                local prev = orderedPath[i - 1]
+                local nextNode = orderedPath[i + 1]
+                local conn = getConnections(prev, node, nextNode)
+                puzzle.gridConnections[string.format("%d-%d", node.row, node.col)] = conn
+
+                if i % CONFIG.NodesPerUpdate == 0 or i == #orderedPath then
+                    pcall(function() puzzle:updateGui() end)
+                    task.wait(CONFIG.ConnectionSpeed)
+                end
+            end
+
+            pcall(function() puzzle:checkForWin() end)
+            task.wait(CONFIG.ConnectionSpeed * 0.5)
+        end
+
+        pcall(function() puzzle:updateGui() end)
+        pcall(function() puzzle:checkForWin() end)
+    end
+
+    local function setupHook()
+        local flowGamePath = ReplicatedStorage:WaitForChild("Modules", 5)
+        if not flowGamePath then return false end
+
+        local misc = flowGamePath:FindFirstChild("Minigames")
+        if not misc then return false end
+
+        local flowGameManager = misc:FindFirstChild("FlowGameManager")
+        if not flowGameManager then return false end
+
+        local flowGame = flowGameManager:FindFirstChild("FlowGame")
+        if not flowGame then return false end
+
+        local success, FlowGameModule = pcall(require, flowGame)
+        if not success or not FlowGameModule then return false end
+
+        if not FlowGameModule.new then return false end
+
+        local oldNew = FlowGameModule.new
+        FlowGameModule.new = function(...)
+            local args = { ... }
+            local output = { oldNew(unpack(args)) }
+            local puzzle = output[1]
+
+            if puzzle and puzzle.Solution and CONFIG.AutoConnect then
+                task.spawn(function()
+                    local startTime = tick()
+                    while CONFIG.AutoConnect and tick() - startTime < CONFIG.MaxWaitTime do
+                        if LocalPlayer.PlayerGui:FindFirstChild("PuzzleUI") then
+                            drawSolutionOneByOne(puzzle)
+                            break
+                        end
+                        task.wait(0.3)
+                    end
+                end)
+            end
+
+            return unpack(output)
+        end
+
+        return true
+    end
+
+    setupHook()
+
+    -- 对外暴露配置接口（供 UI 回调使用）
+    getgenv().FlowConnect = {
+        SetEnabled = function(v) CONFIG.AutoConnect = v end,
+        SetSpeed = function(v) CONFIG.ConnectionSpeed = math.max(0.001, v) end,
+        GetStatus = function() return CONFIG.AutoConnect, CONFIG.ConnectionSpeed end,
+    }
+end
+
+-- ===== UI 控件（放入 Tabs.zdx 的合适位置） =====
+local ConnectGroup = Tabs.zdx:AddLeftGroupbox("连线修机")
+
+ConnectGroup:AddSlider("ConnectSpeed", {
+    Text = "连线速度",
+    Default = 0.1,
+    Min = 0.1,
+    Max = 5,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(v)
+        getgenv().FlowConnect.SetSpeed(v)
+    end
+})
+
+ConnectGroup:AddToggle("AutoConnectToggle", {
+    Text = "启用连线",
+    Default = false,
+    Callback = function(v)
+        getgenv().FlowConnect.SetEnabled(v)
+    end
+})
+
 if Tabs.zdx then
     local instantGroup = Tabs.zdx:AddLeftGroupbox("秒互动")
     local instantInteractRunning = false
